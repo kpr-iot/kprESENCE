@@ -1,0 +1,309 @@
+# kprESENCE TypeC firmware v1.0
+# D1 mini - ESP32
+# HLK-LD2410C 24Ghz - 24Ghz Radar Human Presence Sensor
+# Neopixel - WS2812B
+# Release v1.0 - 01.10.2023
+# OTA Using ESPHome CLI:
+# esphome compile .\kprESENCE-TypeC.yaml
+# esphome upload .\kprESENCE-TypeC.yaml --device 10.10.10.215
+# esphome logs .\kprESENCE-TypeC.yaml --device 10.10.10.215
+# ===========================================================
+
+esphome:
+  name: kpresence
+  friendly_name: kprESENCE
+  comment: kprESENCE TypeC Radar Human Presense Sensor
+  name_add_mac_suffix: True
+  project: 
+    name: kpr.kprESENCE
+    version: TypeC v1.0.0
+  min_version: 2023.8.0
+
+esp32:
+  board: wemos_d1_mini32
+
+logger:
+  level: debug
+
+api:
+
+ota:
+
+wifi:
+  ap:
+
+captive_portal:
+
+globals:
+  - id: ha_synced
+    type: bool
+    initial_value: "false"
+
+time:
+  - platform: homeassistant
+    id: ha_time
+    on_time_sync:
+      - light.turn_on: 
+          id: neopixel_led
+          effect: Color Wipe
+      - delay: 2000ms
+      - light.turn_off: 
+          id: neopixel_led
+      - delay: 2000ms
+      - light.turn_on:
+          id: neopixel_led
+          red: 0%
+          green: 100%
+          blue: 0%
+          transition_length: 500ms
+      - delay: 3000ms
+      - light.turn_on:
+          id: neopixel_led
+          red: 0%
+          green: 100%
+          blue: 100%
+      - light.turn_off: 
+          id: neopixel_led
+          transition_length: 1000ms
+      - globals.set:
+          id: ha_synced
+          value: "true"
+      - switch.turn_on: status_led_switch
+uart:
+  id: uart_ld2410
+  tx_pin: 17
+  rx_pin: 21
+  baud_rate: 256000
+  parity: NONE
+  stop_bits: 1
+
+ld2410:
+  id: ld2410_radar
+  uart_id: uart_ld2410
+  throttle: 1000ms
+
+binary_sensor:
+  - platform: gpio
+    pin: 16
+    name: Out GPIO Presence
+    icon: mdi:shield-account-outline
+    device_class: presence
+  - platform: ld2410
+    ld2410_id: ld2410_radar
+    has_target:
+      name: Presence
+      icon: mdi:shield-account
+      on_press:
+        then:
+          - if:
+              condition:
+                switch.is_on: status_led_switch
+              then:
+                - light.turn_on: 
+                    id: neopixel_led
+                    effect: Twinkle
+      on_release:
+        then:
+          - if:
+              condition:
+                switch.is_on: status_led_switch
+              then:
+                - light.turn_off: 
+                    id: neopixel_led
+                    transition_length: 50ms
+    has_moving_target:
+      name: Moving Target
+      icon: mdi:target-account
+    has_still_target:
+      name: Still Target
+      icon: mdi:meditation
+
+sensor:
+  - platform: uptime
+    name: Uptime
+    id: sys_uptime
+    entity_category: "diagnostic"
+    update_interval: 60s
+  
+  - platform: wifi_signal 
+    name: Wifi RSSI
+    id: wifi_signal_db
+    icon: mdi:wifi-arrow-left-right
+    update_interval: 60s
+    entity_category: "diagnostic"
+  
+  - platform: ld2410
+    ld2410_id: ld2410_radar
+    moving_distance:
+      name : Moving Distance
+    still_distance:
+      name: Still Distance
+      icon: mdi:move-resize
+    moving_energy:
+      name: Move Energy
+    still_energy:
+      name: Still Energy
+    detection_distance:
+      name: Detection Distance
+      icon: mdi:map-marker-distance
+    light:
+      name: LDR Light
+      icon: mdi:brightness-4
+
+number:
+  - platform: ld2410
+    ld2410_id: ld2410_radar
+    timeout:
+      name: Timeout
+    light_threshold:
+      name: Light threshold
+    max_move_distance_gate:
+      name: Max move distance gate
+    max_still_distance_gate:
+      name: Max still distance gate
+
+select:
+  - platform: ld2410
+    ld2410_id: ld2410_radar
+    distance_resolution:
+      name: "Distance resolution"
+    light_function:
+      name: Light function
+
+switch:
+  - platform: ld2410
+    ld2410_id: ld2410_radar
+    bluetooth:
+      name: "Bluetooth"
+    engineering_mode:
+      name: "Engineering mode"
+  
+  - platform: template
+    id: status_led_switch
+    name: Status LED
+    icon: mdi:alarm-light-outline
+    optimistic: true
+    on_turn_on:
+      if:
+        condition:
+          lambda: 'return !id(ha_synced);'
+        then:
+          if:
+            condition:
+              wifi.connected:
+            then:
+              - light.turn_on: 
+                  id: neopixel_led
+                  red: 20%
+                  green: 15%
+                  blue: 100%
+                  transition_length: 50ms
+            else:
+              - light.turn_on: 
+                  id: neopixel_led
+                  red: 100%
+                  green: 60%
+                  blue: 5%
+                  transition_length: 50ms
+    on_turn_off:
+      - light.turn_off: 
+          id: neopixel_led
+          transition_length: 50ms
+
+button:
+  - platform: restart
+    icon: mdi:power-cycle
+    name: "ESP Reboot"
+    entity_category: "config"
+  
+  - platform: factory_reset
+    disabled_by_default: True
+    name: ESP Factory Reset
+    id: factory_reset_all
+    entity_category: "config"
+  
+  - platform: ld2410
+    ld2410_id: ld2410_radar
+    factory_reset:
+      name: "LD2410 Factory Reset"
+      entity_category: "config"
+    restart:
+      name: "LD2410 Restart"
+      entity_category: "config"
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: IP Address
+      entity_category: "diagnostic"
+      icon: mdi:ip-network
+    ssid:
+      name: Wifi SSID
+      icon: mdi:wifi-check
+    mac_address:
+      name: Wifi MAC
+      entity_category: "diagnostic"
+      icon: mdi:ip-network
+  
+  - platform: version
+    name: ESPHome Version
+    hide_timestamp: true
+
+  - platform: ld2410
+    ld2410_id: ld2410_radar
+    version:
+      name: "LD2410 Firmware"
+    mac_address:
+      name: "LD2410 BT MAC"
+
+light:
+  - platform: status_led
+    id: status_light
+    output: status_output
+
+  - platform: neopixelbus
+    id: neopixel_led
+    type: grb
+    pin:  22
+    num_leds: 1
+    name: "NeoPixel LED"
+    variant: WS2812
+    icon: mdi:led-outline
+    entity_category: ""
+    restore_mode: ALWAYS_OFF
+    # method: ESP32_I2S_0
+    effects:
+      - pulse:
+      - random:
+      - strobe:
+      - addressable_rainbow:
+      - addressable_color_wipe:
+          add_led_interval: 250ms
+      - addressable_twinkle:
+          twinkle_probability: 50%
+
+output:
+  - platform: template
+    id: status_output
+    type: binary
+    write_action:
+      - if:
+          condition:
+            lambda: return state > 0;
+          then:
+            - if:
+                condition:
+                  switch.is_off: status_led_switch
+                then:
+                  switch.turn_on: status_led_switch
+          else:
+            - if:
+                condition:
+                  switch.is_on: status_led_switch
+                then:
+                  switch.turn_off: status_led_switch
+
+
+
+
+
