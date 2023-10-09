@@ -29,6 +29,10 @@ api:
 
 ota:
 
+dashboard_import:
+  package_import_url: github://kpr-iot/kprESENCE/TypeC/kprESENCE-TypeC.yaml@main
+  import_full_config: true
+
 wifi:
   ap:
 
