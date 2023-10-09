@@ -13,7 +13,7 @@ esphome:
   name: kpresence
   friendly_name: kprESENCE
   comment: kprESENCE TypeB Radar Human Presense Sensor
-  name_add_mac_suffix: True
+  name_add_mac_suffix: True # Change to False if you want to rename and remove mac suffix in the name
   project: 
     name: kpr.kprESENCE
     version: TypeB v1.0.0
@@ -32,6 +32,7 @@ dashboard_import:
 
 wifi:
   ap:
+  # use_address: 10.10.10.240
 
 captive_portal:
 
